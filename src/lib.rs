@@ -1,4 +1,10 @@
-use std::{collections::HashSet, hash::Hash, iter::Peekable, str::Chars, sync::Arc};
+use std::{
+    collections::HashSet,
+    hash::{Hash, Hasher},
+    iter::Peekable,
+    str::Chars,
+    sync::Arc,
+};
 
 #[derive(Hash, Eq, PartialEq, Clone, Debug)]
 pub enum Type {
@@ -43,9 +49,9 @@ pub enum Token {
 
     Const(Type),
     Mut(Type),
-    Ident(String),
-    Fn(String),
-    FnIdent(String),
+    Ident(String, u64),
+    Fn(String, u64),
+    FnIdent(String, u64),
     AnonymousFn,
     FnEnd,
     FnOut,
@@ -60,6 +66,13 @@ pub enum Token {
 
     NewLine,
     Unknown(String),
+}
+
+impl Token {
+    fn make_unique() -> u64 {
+        std::hash::BuildHasher::build_hasher(&std::collections::hash_map::RandomState::new())
+            .finish()
+    }
 }
 
 impl Hash for Token {
@@ -113,11 +126,18 @@ impl Hash for Token {
                 "mut".hash(state);
                 ty.hash(state);
             }
-            Self::Ident(name) => {
+            Self::Ident(name, id) => {
+                id.hash(state);
                 "ident".hash(state);
                 name.hash(state);
             }
-            Self::Fn(name) => {
+            Self::Fn(name, id) => {
+                id.hash(state);
+                "fn".hash(state);
+                name.hash(state);
+            }
+            Self::FnIdent(name, id) => {
+                id.hash(state);
                 "fn".hash(state);
                 name.hash(state);
             }
@@ -253,12 +273,12 @@ impl Iterator for Lexer<'_> {
                     match (iter.next(), word.get(1..)) {
                         (Some('`'), Some(string)) => Token::String(string.to_string()),
                         (Some('$'), Some(ident)) => {
-                            let token = Token::Ident(ident.to_string());
+                            let token = Token::Ident(ident.to_string(), Token::make_unique());
                             self.idents.insert(Arc::new(token.clone()));
                             token
                         }
                         (Some('#'), Some(ident)) => {
-                            let token = Token::Fn(ident.to_string());
+                            let token = Token::Fn(ident.to_string(), Token::make_unique());
                             self.idents.insert(Arc::new(token.clone()));
                             token
                         }
@@ -287,7 +307,7 @@ impl Iterator for Lexer<'_> {
                         }
                         (Some('~'), Some(ident)) => {
                             if let Some(i) = self.idents.iter().find(|i| match i.as_ref() {
-                                Token::Ident(i) => i.as_str() == ident,
+                                Token::Ident(i, id) => i.as_str() == ident,
                                 _ => false,
                             }) {
                                 Token::MutRef(i.clone())
@@ -298,7 +318,7 @@ impl Iterator for Lexer<'_> {
                         _ => {
                             if word.ends_with('#') {
                                 if let Some(i) = self.idents.iter().find(|i| match i.as_ref() {
-                                    Token::Fn(i) => match word.get(..(word.len() - 1)) {
+                                    Token::Fn(i, id) => match word.get(..(word.len() - 1)) {
                                         Some(name) => name == i.as_str(),
                                         None => false,
                                     },
@@ -309,7 +329,7 @@ impl Iterator for Lexer<'_> {
                                     Token::UnboundFnRef(word)
                                 }
                             } else if let Some(i) = self.idents.iter().find(|i| match i.as_ref() {
-                                Token::Ident(i) => i.as_str() == word.as_str(),
+                                Token::Ident(i, id) => i.as_str() == word.as_str(),
                                 _ => false,
                             }) {
                                 Token::Ref(i.clone())
