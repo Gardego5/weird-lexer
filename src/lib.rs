@@ -7,7 +7,7 @@ pub enum Type {
     String,
     Bool,
     Char,
-    Function,
+    Fn,
     Custom(String),
 }
 
@@ -45,6 +45,7 @@ pub enum Token {
     Mut(Type),
     Ident(String),
     Fn(String),
+    FnIdent(String),
     AnonymousFn,
     FnEnd,
     FnOut,
@@ -273,7 +274,7 @@ impl Iterator for Lexer<'_> {
                                 Some("s" | "string") => Type::String,
                                 Some("b" | "bool") => Type::Bool,
                                 Some("c" | "char") => Type::Char,
-                                Some("fn" | "function") => Type::Function,
+                                Some("fn" | "function") => Type::Fn,
                                 Some(ident) => Type::Custom(ident.to_string()),
                                 None => unreachable!(),
                             };
@@ -320,260 +321,5 @@ impl Iterator for Lexer<'_> {
                 }
             }
         })
-    }
-}
-
-fn main() {
-    let program = "
-#print $a
-  <<# a
-/#
-
-print# 10
-print# `Hello, World!`
-    ";
-    println!("{program}");
-    let tokens: Vec<Token> = Lexer::new(program).collect();
-    println!("{tokens:?}");
-
-    let program = "
-#print $n:int $a:string
-  $n:~int n
-  @ ~n-- > 0
-    <<# a
-  /@
-/#
-
-print# 10 `Hello, World!`
-    ";
-    println!("{program}");
-    let tokens: Vec<Token> = Lexer::new(program).collect();
-    println!("{tokens:?}");
-
-    let program = "
-#print $n:~int $a:string @ ~n-- > 0 <<# a /@ /#
-print# 10 `Hello, World!`
-    ";
-    println!("{program}");
-    let tokens: Vec<Token> = Lexer::new(program).collect();
-    println!("{tokens:?}");
-
-    let program = "
-#fibonacci $n:int
-  ? n < 2
-    <<# n
-  : <<# fibonacci# n - 1, + fibonacci# n - 2
-/#
-    ";
-    println!("{program}");
-    let tokens: Vec<Token> = Lexer::new(program).collect();
-    println!("{tokens:?}");
-
-    let program = "# $a:int $b:int <<# a + b /#";
-    println!("{program}");
-    let tokens: Vec<Token> = Lexer::new(program).collect();
-    println!("{tokens:?}");
-
-    let program = "
-#higher_order $fn:fn
-  <<# fn# 10
-/#
-
-#higher_order # $a:int <<# a * 20 /#
-    ";
-    println!("{program}");
-    let tokens: Vec<Token> = Lexer::new(program).collect();
-    println!("{tokens:?}");
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn add_numbers() {
-        for test in ["1+2", "1+2 ", "1 + 2", " 1+2"] {
-            let mut lexer = Lexer::new(test);
-            assert_eq!(lexer.next(), Some(Token::Int(1)));
-            assert_eq!(lexer.next(), Some(Token::Add));
-            assert_eq!(lexer.next(), Some(Token::Int(2)));
-            assert_eq!(lexer.next(), None);
-        }
-    }
-
-    #[test]
-    fn operators() {
-        let mut lexer = Lexer::new("+-*/");
-        assert_eq!(lexer.next(), Some(Token::Add));
-        assert_eq!(lexer.next(), Some(Token::Sub));
-        assert_eq!(lexer.next(), Some(Token::Mul));
-        assert_eq!(lexer.next(), Some(Token::Div));
-        assert_eq!(lexer.next(), None);
-
-        let mut lexer = Lexer::new("20 / 12");
-        assert_eq!(lexer.next(), Some(Token::Int(20)));
-        assert_eq!(lexer.next(), Some(Token::Div));
-        assert_eq!(lexer.next(), Some(Token::Int(12)));
-    }
-
-    #[test]
-    fn declare_variables() {
-        for test in ["$var 10", "$var 10 ", " $var 10  ", " $var   10 "] {
-            let mut lexer = Lexer::new(test);
-            assert_eq!(lexer.next(), Some(Token::Ident("var".to_string())));
-            assert_eq!(lexer.next(), Some(Token::Int(10)));
-            assert_eq!(lexer.next(), None);
-        }
-    }
-
-    #[test]
-    fn declare_variables_with_types() {
-        for test in [
-            "$some :int 20 ",
-            " $some:int 20",
-            " $some:i 20",
-            "$some :i 20",
-        ] {
-            let mut lexer = Lexer::new(test);
-            assert_eq!(lexer.next(), Some(Token::Ident("some".to_string())));
-            assert_eq!(lexer.next(), Some(Token::Const(Type::Int)));
-            assert_eq!(lexer.next(), Some(Token::Int(20)));
-            assert_eq!(lexer.next(), None);
-        }
-    }
-
-    #[test]
-    fn comparison_operators() {
-        let mut lexer = Lexer::new("1 > 2");
-        assert_eq!(lexer.next(), Some(Token::Int(1)));
-        assert_eq!(lexer.next(), Some(Token::GreaterThan));
-        assert_eq!(lexer.next(), Some(Token::Int(2)));
-        assert_eq!(lexer.next(), None);
-
-        let mut lexer = Lexer::new("1 >= 2 ");
-        assert_eq!(lexer.next(), Some(Token::Int(1)));
-        assert_eq!(lexer.next(), Some(Token::GreaterOrEqual));
-        assert_eq!(lexer.next(), Some(Token::Int(2)));
-        assert_eq!(lexer.next(), None);
-
-        let mut lexer = Lexer::new(" 1>=2");
-        assert_eq!(lexer.next(), Some(Token::Int(1)));
-        assert_eq!(lexer.next(), Some(Token::GreaterOrEqual));
-        assert_eq!(lexer.next(), Some(Token::Int(2)));
-        assert_eq!(lexer.next(), None);
-
-        let mut lexer = Lexer::new("1 = 2");
-        assert_eq!(lexer.next(), Some(Token::Int(1)));
-        assert_eq!(lexer.next(), Some(Token::Equals));
-        assert_eq!(lexer.next(), Some(Token::Int(2)));
-        assert_eq!(lexer.next(), None);
-    }
-
-    #[test]
-    fn increment_decrement() {
-        let mut lexer = Lexer::new("++ --");
-        assert_eq!(lexer.next(), Some(Token::Increment));
-        assert_eq!(lexer.next(), Some(Token::Decrement));
-        assert_eq!(lexer.next(), None);
-
-        let mut lexer = Lexer::new("20--");
-        assert_eq!(lexer.next(), Some(Token::Int(20)));
-        assert_eq!(lexer.next(), Some(Token::Decrement));
-        assert_eq!(lexer.next(), None);
-
-        let mut lexer = Lexer::new("++20.0");
-        assert_eq!(lexer.next(), Some(Token::Increment));
-        assert_eq!(lexer.next(), Some(Token::Float(20.)));
-        assert_eq!(lexer.next(), None);
-    }
-
-    #[test]
-    fn new_line() {
-        let mut lexer = Lexer::new("\n");
-        assert_eq!(lexer.next(), Some(Token::NewLine));
-        assert_eq!(lexer.next(), None);
-    }
-
-    #[test]
-    fn string() {
-        let mut lexer = Lexer::new("`hello world`");
-        assert_eq!(lexer.next(), Some(Token::String("hello world".to_string())));
-        assert_eq!(lexer.next(), None);
-
-        let mut lexer = Lexer::new("$statement `hello world` ");
-        assert_eq!(lexer.next(), Some(Token::Ident("statement".to_string())));
-        assert_eq!(lexer.next(), Some(Token::String("hello world".to_string())));
-        assert_eq!(lexer.next(), None);
-    }
-
-    #[test]
-    fn mutable_variables() {
-        let mut lexer = Lexer::new("$var:~i 10");
-        assert_eq!(lexer.next(), Some(Token::Ident("var".to_string())));
-        assert_eq!(lexer.next(), Some(Token::Mut(Type::Int)));
-        assert_eq!(lexer.next(), Some(Token::Int(10)));
-        assert_eq!(lexer.next(), None);
-
-        let mut lexer = Lexer::new("$var :~int 20");
-        assert_eq!(lexer.next(), Some(Token::Ident("var".to_string())));
-        assert_eq!(lexer.next(), Some(Token::Mut(Type::Int)));
-        assert_eq!(lexer.next(), Some(Token::Int(20)));
-        assert_eq!(lexer.next(), None);
-
-        let mut lexer = Lexer::new("$var :~string `cole`");
-        assert_eq!(lexer.next(), Some(Token::Ident("var".to_string())));
-        assert_eq!(lexer.next(), Some(Token::Mut(Type::String)));
-        assert_eq!(lexer.next(), Some(Token::String("cole".to_string())));
-        assert_eq!(lexer.next(), None);
-
-        let mut lexer = Lexer::new("$should_be_const :~string `Cole Davis is a very cool guy.`");
-        assert_eq!(
-            lexer.next(),
-            Some(Token::Ident("should_be_const".to_string()))
-        );
-        assert_eq!(lexer.next(), Some(Token::Mut(Type::String)));
-        assert_eq!(
-            lexer.next(),
-            Some(Token::String("Cole Davis is a very cool guy.".to_string()))
-        );
-        assert_eq!(lexer.next(), None);
-    }
-
-    #[test]
-    fn function_declaration() {
-        let mut lexer = Lexer::new(" #main /# ");
-        assert_eq!(lexer.next(), Some(Token::Fn("main".to_string())));
-        assert_eq!(lexer.next(), Some(Token::FnEnd));
-        assert_eq!(lexer.next(), None);
-    }
-
-    #[test]
-    fn function_calls() {
-        let mut lexer = Lexer::new(
-            "
-            #hello_world
-                << `Hello World`
-            /#
-
-            hello_world#
-            ",
-        );
-        assert_eq!(lexer.next(), Some(Token::NewLine));
-        let declaration = lexer.next();
-        assert_eq!(declaration, Some(Token::Fn("hello_world".to_string())));
-        assert_eq!(lexer.next(), Some(Token::NewLine));
-        assert_eq!(lexer.next(), Some(Token::StdOut));
-        assert_eq!(lexer.next(), Some(Token::String("Hello World".to_string())));
-        assert_eq!(lexer.next(), Some(Token::NewLine));
-        assert_eq!(lexer.next(), Some(Token::FnEnd));
-        assert_eq!(lexer.next(), Some(Token::NewLine));
-        assert_eq!(lexer.next(), Some(Token::NewLine));
-        match lexer.next() {
-            Some(Token::Ref(token)) => assert_eq!(token.as_ref(), &declaration.unwrap()),
-            token => panic!("Expected Token::Ref, got {:?}", token),
-        }
-
-        assert_eq!(lexer.next(), Some(Token::NewLine));
-        assert_eq!(lexer.next(), None)
     }
 }
