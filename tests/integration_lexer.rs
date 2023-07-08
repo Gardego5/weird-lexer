@@ -1,4 +1,4 @@
-use wierd_lexer::*;
+use weird_lexer::*;
 
 #[test]
 fn add_numbers() {

@@ -1,5 +1,5 @@
 [package]
-name = "wierd_lexer"
+name = "weird_lexer"
 version = "0.1.0"
 edition = "2021"
 
