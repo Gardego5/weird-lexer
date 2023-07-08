@@ -14,7 +14,7 @@ pub enum Type {
     Bool,
     Char,
     Fn,
-    Custom(String),
+    Custom(String, u64),
 }
 
 #[derive(PartialEq, Clone, Debug)]
@@ -69,7 +69,7 @@ pub enum Token {
 }
 
 impl Token {
-    fn make_unique() -> u64 {
+    fn unique() -> u64 {
         std::hash::BuildHasher::build_hasher(&std::collections::hash_map::RandomState::new())
             .finish()
     }
@@ -273,12 +273,12 @@ impl Iterator for Lexer<'_> {
                     match (iter.next(), word.get(1..)) {
                         (Some('`'), Some(string)) => Token::String(string.to_string()),
                         (Some('$'), Some(ident)) => {
-                            let token = Token::Ident(ident.to_string(), Token::make_unique());
+                            let token = Token::Ident(ident.to_string(), Token::unique());
                             self.idents.insert(Arc::new(token.clone()));
                             token
                         }
                         (Some('#'), Some(ident)) => {
-                            let token = Token::Fn(ident.to_string(), Token::make_unique());
+                            let token = Token::Fn(ident.to_string(), Token::unique());
                             self.idents.insert(Arc::new(token.clone()));
                             token
                         }
@@ -295,7 +295,7 @@ impl Iterator for Lexer<'_> {
                                 Some("b" | "bool") => Type::Bool,
                                 Some("c" | "char") => Type::Char,
                                 Some("fn" | "function") => Type::Fn,
-                                Some(ident) => Type::Custom(ident.to_string()),
+                                Some(ident) => Type::Custom(ident.to_string(), Token::unique()),
                                 None => unreachable!(),
                             };
 
