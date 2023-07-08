@@ -1,0 +1,57 @@
+// Garrett Lang
+
+// Here's a comment
+// Types:
+// - i = int
+// - f = float
+// - s = string
+// - b = bool
+// - c = char
+//
+// You can define them as mutable by prepending a tilde (~) to the type
+//
+// You can define arrays
+// - [i] = array of ints
+//
+// You can declare variables are nullable
+// - i? = nullable int
+
+$number-1:~int 10           // define a variable named number-1 with type int and value 10
+~number-1 number-1 + 10   // add 10 to number-1
+<< number-1               // print the value of number-1 (20)
+
+// Objects
+(person     // define a custom type `person`
+  name:string    // define a field `person` with type int
+  age:int?
+  #about $*
+    <<# `My name is {*.name} and I am {*.age} years old.`
+  /#
+)
+
+// Create an instance of a custom type
+$person-1:person (.name `cole` .age 15)
+<< `{person-1.name} is {person-1.age} years old`
+
+// Functions
+#add $a $b
+  <<# a + b
+/#
+
+// Fibonacci
+#fibonacci $num:int
+  ? num < 2
+    <<# num
+  : <<# fibonacci# num - 1, + fibonacci# num - 2,
+/#
+
+// Loops
+$i:~int 0
+@ i < 10
+  <<@ ~i++
+/@
+
+// Anonymous functions
+# $a:int $b:int <<# a + b /#
+
+
