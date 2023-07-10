@@ -60,6 +60,8 @@ pub enum Token {
     LoopOut,
     If,
     Else,
+    ElseIf,
+    IfEnd,
     StdIn,
     StdOut,
     StdErr,
@@ -67,6 +69,8 @@ pub enum Token {
     NewLine,
     Unknown(String),
 }
+
+struct Scope {}
 
 impl Token {
     fn unique() -> u64 {
@@ -190,16 +194,11 @@ impl Iterator for Lexer<'_> {
                     false
                 }
             }
-            ("/#", _, _, _) => true,
-            (_, _, Some(',' | ';'), _) => true,
-            (_, _, Some(_), None) => true,
-            (_, _, Some(_), Some(' ')) => true,
+            ("/#" | "?" | ":?", _, _, _) => true,
+            (_, _, Some(_), None | Some(' ')) => true,
             (_, _, Some('#'), Some('a'..='z' | 'A'..='Z')) => false,
-            (_, _, Some('#' | '@'), _) => true,
-            (_, _, Some('\n'), _) => true,
-            (_, _, Some(a @ ('+' | '-' | '*' | '/')), Some(b @ ('+' | '-' | '*' | '/'))) => {
-                !(a == b)
-            }
+            (_, _, Some(':'), Some('?')) => false,
+            (_, _, Some('#' | '@' | '\n' | ',' | ';'), _) => true,
             (
                 _,
                 _,
@@ -209,10 +208,9 @@ impl Iterator for Lexer<'_> {
             (
                 _,
                 _,
-                Some('a'..='z' | 'A'..='Z' | '0'..='9'),
-                Some('+' | '-' | '*' | '/' | '>' | '<' | '=' | '\n' | ',' | ';'),
+                Some('a'..='z' | 'A'..='Z' | '0'..='9' | ':' | '?'),
+                Some('+' | '-' | '*' | '/' | '>' | '<' | '=' | '\n' | ',' | ';' | '$' | ':' | '?'),
             ) => true,
-            (_, _, Some('a'..='z' | 'A'..='Z'), Some(':')) => true,
             _ => false,
         } {
             if let Some(ch) = self.content.next() {
@@ -238,13 +236,10 @@ impl Iterator for Lexer<'_> {
 
             "?" => Token::If,
             ":" => Token::Else,
-            "#" => Token::AnonymousFn,
+            ":?" => Token::ElseIf,
+            "/?" => Token::IfEnd,
 
-            mark @ ("," | ";") => Token::Punct(
-                mark.chars()
-                    .next()
-                    .expect("there should only be single char marks"),
-            ),
+            "#" => Token::AnonymousFn,
 
             "++" => Token::Increment,
             "--" => Token::Decrement,
@@ -261,6 +256,8 @@ impl Iterator for Lexer<'_> {
             "<!" => Token::StdErr,
 
             "\n" => Token::NewLine,
+
+            mark @ ("," | ";") => Token::Punct(mark.chars().next().unwrap()),
 
             _ => {
                 if let Ok(int) = word.parse::<i32>() {
